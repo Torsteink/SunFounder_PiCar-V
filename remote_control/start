@@ -14,9 +14,20 @@ if [ "$1" = "" ]
 then
 	# Run server listen to any IP address and port 8000
 	echo "Server running"
-	python3 manage.py runserver 0.0.0.0:8000
+	if [ -x ../venv/bin/python ]; then
+		../venv/bin/python manage.py runserver 0.0.0.0:8000
+	else
+		python3 manage.py runserver 0.0.0.0:8000
+	fi
 elif [ "$1" = "install" ]
 then
 	echo 'Running servo installation'
-	python3 remote_control/driver/Servo.py install
+	if [ -x ../venv/bin/picar ]; then
+		../venv/bin/picar servo-install
+	elif command -v picar >/dev/null 2>&1; then
+		picar servo-install
+	else
+		echo 'picar command not found. Run ../install_dependencies first.'
+		exit 1
+	fi
 fi

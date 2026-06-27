@@ -1,11 +1,9 @@
 import numpy as np
 import cv2
-import threading
 import os
-from flask import Flask, render_template, Response
-from multiprocessing import Process, Manager
+from flask import Flask, Response
+from multiprocessing import Manager
 import time
-import datetime
 
 
 
@@ -18,8 +16,16 @@ def index():
 def gen():
     """Video streaming generator function."""
     while True:  
+        img = Vilib.img_array[0]
+        if img is None or not hasattr(img, "size") or img.size == 0:
+            time.sleep(0.05)
+            continue
 
-        frame = cv2.imencode('.jpg', Vilib.img_array[0])[1].tobytes()
+        ok, encoded = cv2.imencode('.jpg', img)
+        if not ok:
+            time.sleep(0.05)
+            continue
+        frame = encoded.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
@@ -33,12 +39,13 @@ def video_feed():
                     mimetype='multipart/x-mixed-replace; boundary=frame') 
 
 def web_camera_start():
-    app.run(host='0.0.0.0', port=8765,threaded=True)
+    port = int(os.environ.get("PICAR_STREAM_PORT", "8765"))
+    app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)
 
 
 class Vilib(object): 
 
-    video_source = 0
+    video_source = os.environ.get("PICAR_CAMERA_SOURCE", "0")
 
     detect_obj_parameter = Manager().dict()
     img_array = Manager().list(range(2))
@@ -63,19 +70,26 @@ class Vilib(object):
 
     @staticmethod
     def camera():
- 
-        camera = cv2.VideoCapture(Vilib.video_source)
+        video_source = Vilib.video_source
+        if isinstance(video_source, str) and video_source.isdigit():
+            video_source = int(video_source)
+
+        camera = cv2.VideoCapture(video_source)
+        if not camera.isOpened():
+            print("Unable to open camera source: {0}".format(Vilib.video_source))
+            return
 
         camera.set(3,320)
         camera.set(4,240)
-        width = int(camera.get(3))
-        height = int(camera.get(4))
         camera.set(cv2.CAP_PROP_BUFFERSIZE,1)
         cv2.setUseOptimized(True)
  
 
         while True:
-            _, img = camera.read()
+            ok, img = camera.read()
+            if not ok or img is None:
+                time.sleep(0.05)
+                continue
 
             Vilib.img_array[0] = img
 
