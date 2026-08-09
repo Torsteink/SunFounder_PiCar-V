@@ -1,0 +1,8 @@
+# Shared settings for trusted checkouts of this repository. Keep model,
+# provider, authentication, editor, and notification preferences user-scoped.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+
+[sandbox_workspace_write]
+network_access = false
