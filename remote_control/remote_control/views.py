@@ -14,6 +14,7 @@ import os
 import subprocess
 from inspect import signature
 from pathlib import Path
+from threading import Lock
 
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
@@ -25,6 +26,7 @@ bw = None
 cam = None
 SPEED = int(os.environ.get("PICAR_DEFAULT_SPEED", "60"))
 bw_status = 0
+setup_lock = Lock()
 
 
 def get_config_path():
@@ -97,10 +99,13 @@ def home(request):
 def ensure_setup():
 	if is_setup:
 		return None
-	try:
-		setup()
-	except Exception as exc:
-		return HttpResponseServerError("PiCar setup failed: {0}".format(exc))
+	with setup_lock:
+		if is_setup:
+			return None
+		try:
+			setup()
+		except Exception as exc:
+			return HttpResponseServerError("PiCar setup failed: {0}".format(exc))
 	return None
 
 def run(request):
@@ -210,6 +215,8 @@ def run(request):
 		if bw_status != 0:
 			bw.speed = SPEED
 		debug = "speed =", speed
+	if 'action' in request.GET or 'speed' in request.GET:
+		return HttpResponse(status=204)
 	#host = stream.get_host().decode('utf-8').split(' ')[0]
 	host = get_ip()
 	return render(request, "run.html", {'host': host, 'stream_port': get_stream_port()})
